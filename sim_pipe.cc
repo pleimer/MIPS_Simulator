@@ -3,10 +3,12 @@
 	Implement data flow
 	Add hazard handling
 	
+	figure out what to do with stages for get_sp_register()!
+	
 	Should I change instruction memory to little endian?
 	
 	Up Next: 
-		initialize sp registers, define get_sp_register()
+		
 */
 #include "sim_pipe.h"
 #include <stdlib.h>
