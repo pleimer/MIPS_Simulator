@@ -1,3 +1,13 @@
+/*
+	To do: Implement the rest of the instructions
+	Implement data flow
+	Add hazard handling
+	
+	Should I change instruction memory to little endian?
+	
+	Up Next: 
+		initialize sp registers, define get_sp_register()
+*/
 #include "sim_pipe.h"
 #include <stdlib.h>
 #include <iostream>
@@ -12,16 +22,28 @@ static const char *stage_names[NUM_STAGES] = {"IF", "ID", "EX", "MEM", "WB"};
 sim_pipe::sim_pipe(unsigned mem_size, unsigned mem_latency){
 	
 	//allocate memory
+	//sp registers
+	sp_registers = new int[NUM_SP_REGISTERS];
+	fill_n(sp_registers, NUM_SP_REGISTERS, UNDEFINED);
+	
+	//gp registers
+	gp_registers = new int[NUM_GP_REGISTERS];
+	fill_n(gp_registers, NUM_GP_REGISTERS, UNDEFINED);
+	
+	//data memory
 	data_memory_size = mem_size;
 	data_memory = new byte[data_memory_size];
 	fill_n(data_memory, data_memory_size, 0xFF);
 	
+	//instruction memory
 	inst_memory_size = 65536;
 	inst_memory = new byte[inst_memory_size];
 	fill_n(inst_memory,inst_memory_size, 0xFF);
 }
 	
 sim_pipe::~sim_pipe(){
+	delete[] gp_registers;
+	delete[] sp_registers;
 	delete[] data_memory;
 	delete[] inst_memory;
 }
@@ -39,14 +61,21 @@ void sim_pipe::reset(){
 }
 
 unsigned sim_pipe::get_sp_register(sp_register_t reg, stage_t s){
-	return 0; //please modify
+	//reg - register to print 
+	//s - stage to print it for????
+	
+	//for now, just return the value of that register - later,
+	//I will have to implement the changes of the registers 
+	//at the stage, assumingly in the run() method
+	return sp_registers[reg];
 }
 
 int sim_pipe::get_gp_register(unsigned reg){
-	return 0; //please modify
+	return gp_registers[reg];
 }
 
 void sim_pipe::set_gp_register(unsigned reg, int value){
+	gp_registers[reg] = value;
 }
 
 float sim_pipe::get_IPC(){
@@ -86,6 +115,10 @@ void sim_pipe::print_inst_memory(unsigned start_address, unsigned end_address){
 }
 
 void sim_pipe::write_memory(unsigned address, unsigned value){
+	//store to data memory in little endian at address
+	for(int i=0; i<4;i++){
+		data_memory[address + i] = (byte) (value >> 8*i);
+	}
 }
 
 void sim_pipe::print_registers(){

@@ -20,7 +20,8 @@ typedef enum {IF, ID, EX, MEM, WB} stage_t;
 class sim_pipe{
 
 	/* Add the data members required by your simulator's implementation here */
-	
+	int *gp_registers;
+	int *sp_registers;
 	
 	//data memory - should be initialize to all 0xFF
 	byte *data_memory;

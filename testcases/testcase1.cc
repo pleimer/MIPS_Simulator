@@ -38,17 +38,17 @@ int main(int argc, char **argv){
 	// first 8 clock cycles
 	cout << "First 8 clock cycles: inspecting the registers at each clock cycle..." << endl;
 	cout << "======================================================================" << endl << endl;
-/*
+
 	for (i=0; i<8; i++){
 		cout << "CLOCK CYCLE #" << dec << i << endl;
 		mips->run(1);
 		mips->print_registers();
 		cout << endl;
-	}*/
+	}
 	
 	// runs program to completion
 	cout << "EXECUTING PROGRAM TO COMPLETION..." << endl << endl;
-	//mips->run(); 
+	mips->run(); 
 
 	cout << "PROGRAM TERMINATED\n";
 	cout << "===================" << endl << endl;
