@@ -57,7 +57,11 @@ void sim_pipe::load_program(const char *filename, unsigned base_address){
 void sim_pipe::run(unsigned cycles){
 }
 	
-void sim_pipe::reset(){
+void sim_pipe::reset(){ //reset all memory and registers
+	fill_n(sp_registers, NUM_SP_REGISTERS, UNDEFINED);
+	fill_n(gp_registers, NUM_GP_REGISTERS, UNDEFINED);
+	fill_n(data_memory, data_memory_size, 0xFF);
+	fill_n(inst_memory,inst_memory_size, 0xFF);
 }
 
 unsigned sim_pipe::get_sp_register(sp_register_t reg, stage_t s){
