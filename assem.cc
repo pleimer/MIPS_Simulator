@@ -21,19 +21,6 @@ using namespace std;
 
 const char * WHITE_SPACE = " \t"; //space and tab
 
-map<opcode_t, byte> m_opcode = { //will shift these later to take only 6 bits
-	{LW,0x00},
-	{SW,0x01 << 2},
-	{ADD,0x02 << 2},
-	{ADDI, 0x03 << 2},
-	{SUB,0x04 << 2},
-	{SUBI,0x05 << 2},
-	{XOR,0x06 << 2},
-	{BLTZ,0x07 << 2},
-	{BNEZ,0x08 << 2},
-	{EOP,0x09 << 2}
-};
-
 class eofException: public exception{
 	virtual const char* what() const throw(){
 		return "End of file.";
@@ -74,11 +61,11 @@ void assembler::assemble(string path, byte * inst_memory){
 						reg.pop_back();
 						unsigned int regNum = stoi(reg);
 						if(tok.getCol() == 1)
-							regNum = regNum <<  (INST_SIZE - OP_SIZE - REG_REF_SIZE);
+							regNum = regNum <<  (INST_SIZE - OP_SIZE - REG_REF_SIZE*3); //rd
 						if(tok.getCol() == 2)
-							regNum = regNum <<  (INST_SIZE - OP_SIZE - REG_REF_SIZE*2);
+							regNum = regNum <<  (INST_SIZE - OP_SIZE - REG_REF_SIZE); //rs
 						if(tok.getCol() == 3)
-							regNum = regNum <<  (INST_SIZE - OP_SIZE - REG_REF_SIZE*3);
+							regNum = regNum <<  (INST_SIZE - OP_SIZE - REG_REF_SIZE*2); //rt
 						
 						instruction = instruction | regNum;
 					
@@ -196,25 +183,25 @@ void assembler::assemble(string path, byte * inst_memory){
 byte assembler::mapCode(token tok){ //return binary opcode value from token string
 	string cargo = tok.getCargo();
 	if(cargo.compare("LW")==0)
-		return m_opcode[LW];
+		return (byte)(LW);
 	if(cargo.compare("SW")==0)
-		return m_opcode[SW];
+		return (byte)(SW);
 	if(cargo.compare("ADD")==0)
-		return m_opcode[ADD];
+		return (byte)(ADD);
 	if(cargo.compare("ADDI")==0)
-		return m_opcode[ADDI];
+		return (byte)(ADDI);
 	if(cargo.compare("SUB")==0)
-		return m_opcode[SUB];
+		return (byte)(SUB);
 	if(cargo.compare("SUBI")==0)
-		return m_opcode[SUBI];
+		return (byte)(SUBI);
 	if(cargo.compare("XOR")==0)
-		return m_opcode[XOR];
+		return (byte)(XOR);
 	if(cargo.compare("BLTZ")==0)
-		return m_opcode[BLTZ];
+		return (byte)(BLTZ);
 	if(cargo.compare("BNEZ")==0)
-		return m_opcode[BNEZ];
+		return (byte)(BNEZ);
 	if(cargo.compare("EOP")==0)
-		return m_opcode[EOP];
+		return (byte)(EOP);;
 	
 	return 0xFC; //bad value
 }
