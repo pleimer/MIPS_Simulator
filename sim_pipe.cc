@@ -5,6 +5,8 @@
 	
 	figure out what to do with stages for get_sp_register()!
 	
+	make it such that address 0x10000000 is actually address 0 so we don't have to allocate so much memory
+	
 	Up Next: 
 		Implement run() - get the stages rolling!
 */
@@ -37,7 +39,7 @@ sim_pipe::sim_pipe(unsigned mem_size, unsigned mem_latency){
 	fill_n(data_memory, data_memory_size, 0xFF);
 	
 	//instruction memory
-	inst_memory_size = 65536;
+	inst_memory_size = 256;
 	inst_memory = new byte[inst_memory_size];
 	fill_n(inst_memory,inst_memory_size, 0xFF);
 }
@@ -51,22 +53,31 @@ sim_pipe::~sim_pipe(){
 void sim_pipe::load_program(const char *filename, unsigned base_address){
 	/*parse instructions - load into instruction memory*/
 	as.assemble(filename, inst_memory);
-	this->print_inst_memory(0x0000, 0x000F * 4);
+	//start pc at base address
+	sp_registers[IF][PC] = base_address; //start at 0
+	this->print_inst_memory(base_address - 0x10000000, base_address - 0x10000000 + 0x000F * 4);
 }
 
 void sim_pipe::run(unsigned cycles){
 	//run for num clock cycles "cycles"
 	//if "cycles" is 0, run until EOP
 	
-	switch(cycles){
-		case 0://run to completion
-		
-		default://run for number of cycles
-			for(int i=0;i<cycles;i++){
+	//for now, just number of clock cycles
+		unsigned int inst_in_pipeline = 0;
+		for(int i=0; i<cycles;i++){ //each loop is a clock cycle
+			for(int j=0;j<=inst_in_pipeline;j++){ //each loop is a stage of another instruction
+				
+				//get next instruction (IF) -> implement here
+				//registers: IF/ID.IR, IF/ID.NPC, IF/ID.PC
+				sp_registers[IF][IR] = inst_memory[sp_registers[IF][PC] - 0x10000000];
+				//mux
+				if((sp_registers[EX][COND]==UNDEFINED) ||  !(sp_registers[EX][COND])){
+					sp_registers[IF][NPC] = sp_registers[IF][PC] +4;
+					sp_registers[IF][PC] +=4; 
+				}
 				
 			}
-	}
-	
+		}
 }
 	
 void sim_pipe::reset(){ //reset all memory and registers
