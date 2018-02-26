@@ -21,7 +21,7 @@ class sim_pipe{
 
 	/* Add the data members required by your simulator's implementation here */
 	int *gp_registers;
-	int *sp_registers;
+	int sp_registers[NUM_STAGES][NUM_SP_REGISTERS];
 	
 	//data memory - should be initialize to all 0xFF
 	byte *data_memory;

@@ -5,10 +5,8 @@
 	
 	figure out what to do with stages for get_sp_register()!
 	
-	Should I change instruction memory to little endian?
-	
 	Up Next: 
-		
+		Implement run() - get the stages rolling!
 */
 #include "sim_pipe.h"
 #include <stdlib.h>
@@ -25,8 +23,9 @@ sim_pipe::sim_pipe(unsigned mem_size, unsigned mem_latency){
 	
 	//allocate memory
 	//sp registers
-	sp_registers = new int[NUM_SP_REGISTERS];
-	fill_n(sp_registers, NUM_SP_REGISTERS, UNDEFINED);
+	for(int i=0;i<NUM_STAGES;i++){
+		fill_n(sp_registers[i], NUM_SP_REGISTERS, UNDEFINED);
+	}
 	
 	//gp registers
 	gp_registers = new int[NUM_GP_REGISTERS];
@@ -45,7 +44,6 @@ sim_pipe::sim_pipe(unsigned mem_size, unsigned mem_latency){
 	
 sim_pipe::~sim_pipe(){
 	delete[] gp_registers;
-	delete[] sp_registers;
 	delete[] data_memory;
 	delete[] inst_memory;
 }
@@ -57,10 +55,24 @@ void sim_pipe::load_program(const char *filename, unsigned base_address){
 }
 
 void sim_pipe::run(unsigned cycles){
+	//run for num clock cycles "cycles"
+	//if "cycles" is 0, run until EOP
+	
+	switch(cycles){
+		case 0://run to completion
+		
+		default://run for number of cycles
+			for(int i=0;i<cycles;i++){
+				
+			}
+	}
+	
 }
 	
 void sim_pipe::reset(){ //reset all memory and registers
-	fill_n(sp_registers, NUM_SP_REGISTERS, UNDEFINED);
+	for(int i=0;i<NUM_STAGES;i++){
+		fill_n(sp_registers[i], NUM_SP_REGISTERS, UNDEFINED);
+	}
 	fill_n(gp_registers, NUM_GP_REGISTERS, UNDEFINED);
 	fill_n(data_memory, data_memory_size, 0xFF);
 	fill_n(inst_memory,inst_memory_size, 0xFF);
@@ -73,7 +85,7 @@ unsigned sim_pipe::get_sp_register(sp_register_t reg, stage_t s){
 	//for now, just return the value of that register - later,
 	//I will have to implement the changes of the registers 
 	//at the stage, assumingly in the run() method
-	return sp_registers[reg];
+	return sp_registers[s][reg];
 }
 
 int sim_pipe::get_gp_register(unsigned reg){
