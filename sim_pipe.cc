@@ -62,7 +62,7 @@ void sim_pipe::load_program(const char *filename, unsigned base_address){
 void sim_pipe::run(unsigned cycles){
 	//run for num clock cycles "cycles"
 	//if "cycles" is 0, run until EOP
-	int ex_ir;
+	int ex_ir, mem_ir;
 	
 	//for now, just number of clock cycles
 		for(unsigned int i=0; i<cycles;i++){ //each loop is a clock cycle
@@ -70,8 +70,23 @@ void sim_pipe::run(unsigned cycles){
 				//WB
 				
 				//MEM
-				
-		
+				mem_ir = get_ir_reg(MEM);
+				switch(get_inst_type(mem_ir)){
+					case MEMORY:
+						sp_registers[WB][IR] = get_ir_reg(MEM);
+						//sp_registers[WB][LMD] //FINISH
+						break;
+					case ARITH:
+						sp_registers[WB][IR] = get_ir_reg(MEM);
+						sp_registers[WB][ALU_OUTPUT] = sp_registers[MEM][ALU_OUTPUT];
+						break;
+					case ARITH_I:
+						sp_registers[WB][IR] = get_ir_reg(MEM);
+						sp_registers[WB][ALU_OUTPUT] = sp_registers[MEM][ALU_OUTPUT];
+						break;
+					default:
+						break;
+				}
 		
 				//EX
 				ex_ir = get_ir_reg(EX);
