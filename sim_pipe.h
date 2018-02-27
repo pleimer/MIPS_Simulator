@@ -17,6 +17,10 @@
 #define IMM_SIGN_EXTEND 0xFFFF0000
 
 #define OPCODE(X) ((opcode_t)((X & 0xFC000000) >> (INST_SIZE-OP_SIZE)))
+//gets reference of register as int
+#define RD(X) 	((X & RD_MASK) >> (INST_SIZE - OP_SIZE - REG_REF_SIZE * 1)) 
+#define RS(X) 	((X & RS_MASK) >> (INST_SIZE - OP_SIZE - REG_REF_SIZE * 2))
+#define RT(X) 	((X & RT_MASK) >> (INST_SIZE - OP_SIZE - REG_REF_SIZE * 3))
 
 typedef enum {PC, NPC, IR, A, B, IMM, COND, ALU_OUTPUT, LMD} sp_register_t;
 

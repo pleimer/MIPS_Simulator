@@ -83,6 +83,7 @@ void sim_pipe::run(unsigned cycles){
 				
 				//MEM
 				mem_ir = get_ir_reg(MEM);
+				sp_registers[WB][ALU_OUTPUT] = sp_registers[MEM][ALU_OUTPUT];
 				switch(get_inst_type(mem_ir)){
 					case MEMORY:
 						sp_registers[WB][IR] = get_ir_reg(MEM);
@@ -91,11 +92,9 @@ void sim_pipe::run(unsigned cycles){
 						break;
 					case ARITH:
 						sp_registers[WB][IR] = get_ir_reg(MEM);
-						sp_registers[WB][ALU_OUTPUT] = sp_registers[MEM][ALU_OUTPUT];
 						break;
 					case ARITH_I:
 						sp_registers[WB][IR] = get_ir_reg(MEM);
-						sp_registers[WB][ALU_OUTPUT] = sp_registers[MEM][ALU_OUTPUT];
 						break;
 					default:
 						break;
