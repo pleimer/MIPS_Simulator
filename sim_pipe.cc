@@ -70,10 +70,12 @@ void sim_pipe::run(unsigned cycles){
 				//WB
 				
 				//MEM
+				
+		
 		
 				//EX
-				ex_ir = get_inst_type(get_ir_reg(EX));
-				switch(ex_ir){
+				ex_ir = get_ir_reg(EX);
+				switch(get_inst_type(ex_ir)){
 					case MEMORY:
 						sp_registers[MEM][IR] = sp_registers[EX][IR];
 						sp_registers[MEM][ALU_OUTPUT] = sp_registers[EX][A]  + sp_registers[EX][IMM];
@@ -130,7 +132,8 @@ void sim_pipe::run(unsigned cycles){
 						}
 						break;
 					case BRANCH:
-						
+						sp_registers[MEM][ALU_OUTPUT] = (sp_registers[EX][NPC] + (sp_registers[EX][IMM] << 2));
+						sp_registers[MEM][COND] = sp_registers[EX][A];
 						break;
 					default:
 						break;
@@ -153,7 +156,6 @@ void sim_pipe::run(unsigned cycles){
 					sp_registers[EX][NPC] = sp_registers[ID][NPC];
 					sp_registers[EX][IR] = sp_registers[ID][IR];
 				}
-				//cout << "HEY"; somehow inserting this fixes my problem
 			
 				//IF
 				sp_registers[ID][IR] = get_inst(sp_registers[IF][PC] - 0x10000000);

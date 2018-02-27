@@ -16,13 +16,13 @@
 #define IMM_SIGN 0x0008000
 #define IMM_SIGN_EXTEND 0xFFFF0000
 
-#define OPCODE(X) (opcode_t)((X & 0xFC000000) >> (INST_SIZE-OP_SIZE))
+#define OPCODE(X) ((opcode_t)((X & 0xFC000000) >> (INST_SIZE-OP_SIZE)))
 
 typedef enum {PC, NPC, IR, A, B, IMM, COND, ALU_OUTPUT, LMD} sp_register_t;
 
 // The NOP instruction should be automatically inserted by the processor to implement pipeline bubbles
 typedef enum {LW, SW, ADD, ADDI, SUB, SUBI, XOR, XORI, OR, ORI, AND, ANDI, MULT, DIV, BEQZ, BNEZ, BLTZ, BGTZ, BLEZ, BGEZ, JUMP, EOP, NOP} opcode_t;
-typedef enum {ARITH_I, ARITH, MEMORY, BRANCH} inst_t;
+typedef enum {ARITH_I, ARITH, MEMORY, BRANCH, UNDEF_INST} inst_t;
 
 typedef enum {IF, ID, EX, MEM, WB} stage_t;
 
@@ -96,7 +96,7 @@ public:
 	void set_gp_register(unsigned reg, int value);
 	
 	//returns instruction at location in instruction memory
-	unsigned get_inst(unsigned base_address);
+	int get_inst(unsigned base_address);
 
 	//returns the IPC
 	float get_IPC();
@@ -123,7 +123,7 @@ public:
 	void print_registers();
 	
 	//get instruction type from IR register
-	inst_t get_inst_type(unsigned IR);
+	int get_inst_type(int inst);
 
 };
 
