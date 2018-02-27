@@ -68,7 +68,8 @@ void sim_pipe::run(unsigned cycles){
 		for(unsigned int i=0; i<cycles;i++){ //each loop is a clock cycle
 
 				//WB - store result or data to rd
-				switch(get_ir_reg(WB)){
+				cout << "IR at WB is: " << hex << get_ir_reg(WB) << endl;
+				switch(get_inst_type(get_ir_reg(WB))){
 					case ARITH:
 						gp_registers[RD(get_ir_reg(WB))] = sp_registers[WB][ALU_OUTPUT];
 						break;
@@ -76,13 +77,14 @@ void sim_pipe::run(unsigned cycles){
 						gp_registers[RD(get_ir_reg(WB))] = sp_registers[WB][ALU_OUTPUT];
 						break;
 					case MEMORY:
-						gp_registers[RD(get_ir_reg(WB))] = sp_registers[WB][LMD];
+						gp_registers[RD(get_ir_reg(WB))] = sp_registers[WB][LMD]; //this needs to go to RT instead, or B
 						break;
 					default: break;
 				}
 				
 				//MEM
 				mem_ir = get_ir_reg(MEM);
+				cout << "IR at MEM is: " << hex << mem_ir << endl;
 				sp_registers[WB][ALU_OUTPUT] = sp_registers[MEM][ALU_OUTPUT];
 				switch(get_inst_type(mem_ir)){
 					case MEMORY:
@@ -102,6 +104,7 @@ void sim_pipe::run(unsigned cycles){
 		
 				//EX
 				ex_ir = get_ir_reg(EX);
+				cout << "IR at EX is: " << hex << ex_ir << endl;
 				switch(get_inst_type(ex_ir)){
 					case MEMORY:
 						sp_registers[MEM][IR] = sp_registers[EX][IR];
@@ -167,12 +170,11 @@ void sim_pipe::run(unsigned cycles){
 				}
 		
 				//ID 
+				cout << "IR at ID is: " << hex << get_ir_reg(ID) << endl;
 				if((unsigned) sp_registers[ID][IR] != UNDEFINED){ 
-					cout << "ID.IR in ID is: " << hex << get_ir_reg(ID) << endl;
 					sp_registers[EX][A] = gp_registers[RS(get_ir_reg(ID))];//(sp_registers[ID][IR] & RS_MASK) >> (INST_SIZE - OP_SIZE - REG_REF_SIZE*2)];//rs
-					if(get_inst_type(get_ir_reg(ID)) == ARITH) {
-						sp_registers[EX][B] = gp_registers[RT(get_ir_reg(ID))];//(sp_registers[ID][IR] & RT_MASK) >> (INST_SIZE - OP_SIZE - REG_REF_SIZE*3)];//rt
-					}
+					if(get_inst_type(get_ir_reg(ID)) == ARITH) sp_registers[EX][B] = gp_registers[RT(get_ir_reg(ID))];//(sp_registers[ID][IR] & RT_MASK) >> (INST_SIZE - OP_SIZE - REG_REF_SIZE*3)];//rt
+					else if(get_inst_type(get_ir_reg(ID)) == MEMORY) sp_registers[EX][B] = gp_registers[RD(get_ir_reg(ID))];
 					if((get_inst_type(get_ir_reg(ID)) == ARITH_I) || (get_inst_type(get_ir_reg(ID)) == MEMORY)){//immediate
 						if(get_ir_reg(ID) & IMM_SIGN) sp_registers[EX][IMM] = ((get_ir_reg(ID) & IMM_MASK) | IMM_SIGN_EXTEND);
 						else sp_registers[EX][IMM] = (get_ir_reg(ID) & IMM_MASK);
@@ -183,7 +185,7 @@ void sim_pipe::run(unsigned cycles){
 			
 				//IF
 				sp_registers[ID][IR] = get_inst(sp_registers[IF][PC] - 0x10000000);
-				cout << "ID.IR in IF: " << hex << get_ir_reg(ID) << endl;
+				cout << "IR at IF is: " << hex << get_ir_reg(ID) << endl;
 				if((get_inst_type(get_ir_reg(MEM)) == BRANCH) && sp_registers[MEM][COND] && (sp_registers[MEM][COND] != (unsigned) UNDEFINED)){
 					sp_registers[ID][NPC] = sp_registers[MEM][ALU_OUTPUT];
 					sp_registers[IF][PC] = sp_registers[MEM][ALU_OUTPUT];
