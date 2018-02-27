@@ -49,6 +49,9 @@ class sim_pipe{
 	
 	//assembler declaration
 	assembler as;
+	
+	//for pipeline control
+	unsigned final_cycles;
 
 public:
 
@@ -73,6 +76,9 @@ public:
 	   - registers should be reset to UNDEFINED value 
 	   - data memory should be reset to all 0xFF values
 	*/
+	
+	bool pipeline(); //contains the pipeline logic
+	
 	void reset();
 
 	// returns value of the specified special purpose register for a given stage (at the "entrance" of that stage)
@@ -122,6 +128,9 @@ public:
 
 	// writes an integer value to data memory at the specified address (use little-endian format: https://en.wikipedia.org/wiki/Endianness)
 	void write_memory(unsigned address, unsigned value);
+	
+	//read integer starting at base value
+	int read_memory(unsigned address);
 
 	//prints the values of the registers 
 	void print_registers();
