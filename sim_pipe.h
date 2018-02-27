@@ -10,12 +10,22 @@
 #define NUM_OPCODES 23
 #define NUM_STAGES 5
 
+#define RD_MASK 0x03E00000
+#define RS_MASK 0x001F0000
+#define RT_MASK 0x0000F800
+#define IMM_SIGN 0x0008000
+#define IMM_SIGN_EXTEND 0xFFFF0000
+
+#define OPCODE(X) (opcode_t)((X & 0xFC000000) >> (INST_SIZE-OP_SIZE))
+
 typedef enum {PC, NPC, IR, A, B, IMM, COND, ALU_OUTPUT, LMD} sp_register_t;
 
 // The NOP instruction should be automatically inserted by the processor to implement pipeline bubbles
 typedef enum {LW, SW, ADD, ADDI, SUB, SUBI, XOR, XORI, OR, ORI, AND, ANDI, MULT, DIV, BEQZ, BNEZ, BLTZ, BGTZ, BLEZ, BGEZ, JUMP, EOP, NOP} opcode_t;
+typedef enum {ARITH_I, ARITH, MEMORY, BRANCH} inst_t;
 
 typedef enum {IF, ID, EX, MEM, WB} stage_t;
+
 
 class sim_pipe{
 
@@ -78,9 +88,15 @@ public:
 
 	//returns value of the specified general purpose register
 	int get_gp_register(unsigned reg);
+	
+	//returns ir register for stage
+	int get_ir_reg(stage_t s);
 
 	// set the value of the given general purpose register to "value"
 	void set_gp_register(unsigned reg, int value);
+	
+	//returns instruction at location in instruction memory
+	unsigned get_inst(unsigned base_address);
 
 	//returns the IPC
 	float get_IPC();
@@ -105,6 +121,9 @@ public:
 
 	//prints the values of the registers 
 	void print_registers();
+	
+	//get instruction type from IR register
+	inst_t get_inst_type(unsigned IR);
 
 };
 

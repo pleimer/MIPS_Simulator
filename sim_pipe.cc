@@ -9,6 +9,7 @@
 	
 	Up Next: 
 		Implement run() - get the stages rolling!
+		Implement opcode control of A and B registers
 */
 #include "sim_pipe.h"
 #include <stdlib.h>
@@ -63,20 +64,98 @@ void sim_pipe::run(unsigned cycles){
 	//if "cycles" is 0, run until EOP
 	
 	//for now, just number of clock cycles
-		unsigned int inst_in_pipeline = 0;
-		for(int i=0; i<cycles;i++){ //each loop is a clock cycle
-			for(int j=0;j<=inst_in_pipeline;j++){ //each loop is a stage of another instruction
+		for(unsigned int i=0; i<cycles;i++){ //each loop is a clock cycle
+
+				//WB
 				
-				//get next instruction (IF) -> implement here
-				//registers: IF/ID.IR, IF/ID.NPC, IF/ID.PC
-				sp_registers[IF][IR] = inst_memory[sp_registers[IF][PC] - 0x10000000];
-				//mux
-				if((sp_registers[EX][COND]==UNDEFINED) ||  !(sp_registers[EX][COND])){
-					sp_registers[IF][NPC] = sp_registers[IF][PC] +4;
-					sp_registers[IF][PC] +=4; 
+				//MEM
+		
+				//EX
+				int ex_ir = sp_registers[EX][IR];
+				switch(get_inst_type(ex_ir)){
+					case MEMORY:
+						sp_registers[MEM][IR] = sp_registers[EX][IR];
+						sp_registers[MEM][ALU_OUTPUT] = sp_registers[EX][A]  + sp_registers[EX][IMM];
+						sp_registers[MEM][B] = sp_registers[EX][B];
+						break;
+					case ARITH:
+						sp_registers[MEM][IR] = sp_registers[EX][IR];
+						switch(OPCODE(ex_ir)){
+							case ADD:
+								sp_registers[MEM][ALU_OUTPUT] = sp_registers[EX][A] + sp_registers[EX][B];
+								break;
+							case SUB:
+								sp_registers[MEM][ALU_OUTPUT] = sp_registers[EX][A] - sp_registers[EX][B];
+								break;
+							case XOR:
+								sp_registers[MEM][ALU_OUTPUT] = sp_registers[EX][A] ^ sp_registers[EX][B];
+								break;
+							case OR:
+								sp_registers[MEM][ALU_OUTPUT] = sp_registers[EX][A] | sp_registers[EX][B];
+								break;
+							case AND:
+								sp_registers[MEM][ALU_OUTPUT] = sp_registers[EX][A] & sp_registers[EX][B];
+								break;
+							case MULT:
+								sp_registers[MEM][ALU_OUTPUT] = sp_registers[EX][A] * sp_registers[EX][B];
+								break;
+							case DIV:
+								sp_registers[MEM][ALU_OUTPUT] = sp_registers[EX][A] / sp_registers[EX][B];
+								break;
+							default:
+								break;
+						}
+						break;
+					case ARITH_I:
+						sp_registers[MEM][IR] = sp_registers[EX][IR];
+						switch(OPCODE(ex_ir)){
+							case ADDI:
+								sp_registers[MEM][ALU_OUTPUT] = sp_registers[EX][A] + sp_registers[EX][IMM];
+								break;
+							case SUBI:
+								sp_registers[MEM][ALU_OUTPUT] = sp_registers[EX][A] - sp_registers[EX][IMM];
+								break;
+							case XORI:
+								sp_registers[MEM][ALU_OUTPUT] = sp_registers[EX][A] ^ sp_registers[EX][IMM];
+								break;
+							case ORI:
+								sp_registers[MEM][ALU_OUTPUT] = sp_registers[EX][A] | sp_registers[EX][IMM];
+								break;
+							case ANDI:
+								sp_registers[MEM][ALU_OUTPUT] = sp_registers[EX][A] & sp_registers[EX][IMM];
+								break;
+							default:
+								break;
+						}
+						break;
+					case BRANCH:
+						
+						break;
 				}
-				
-			}
+		
+				//ID 
+				if((unsigned) sp_registers[ID][IR] != UNDEFINED){ 
+					sp_registers[EX][A] = gp_registers[(sp_registers[ID][IR] & RS_MASK) >> (INST_SIZE - OP_SIZE - REG_REF_SIZE*2)];//rs
+					if(get_inst_type(sp_registers[ID][IR]) == ARITH) {
+						sp_registers[EX][B] = gp_registers[(sp_registers[ID][IR] & RT_MASK) >> (INST_SIZE - OP_SIZE - REG_REF_SIZE*3)];//rt
+					}
+					if(get_ir_reg(ID) & IMM_SIGN) sp_registers[EX][IMM] = ((get_ir_reg(ID) & IMM_MASK) | IMM_SIGN_EXTEND);
+					else {
+						cout << "ID.IR is: " << hex << get_ir_reg(ID) << endl;
+						sp_registers[EX][IMM] = (get_ir_reg(ID) & IMM_MASK);
+						cout << "EX IMM is: " << sp_registers[EX][IMM] << endl;
+					}
+				}
+				//cout << "IR is: " << hex << get_ir_reg(ID);
+
+				sp_registers[EX][NPC] = sp_registers[ID][NPC];
+				sp_registers[EX][IR] = sp_registers[ID][IR];
+				//cout << "EX.IR is: " << hex << get_ir_reg(ID) << endl;
+			
+				//IF
+				sp_registers[ID][IR] = get_inst(sp_registers[IF][PC] - 0x10000000);
+				sp_registers[ID][NPC] = sp_registers[IF][PC] + 4;
+				sp_registers[IF][PC] +=4; 
 		}
 }
 	
@@ -91,16 +170,22 @@ void sim_pipe::reset(){ //reset all memory and registers
 
 unsigned sim_pipe::get_sp_register(sp_register_t reg, stage_t s){
 	//reg - register to print 
-	//s - stage to print it for????
-	
-	//for now, just return the value of that register - later,
-	//I will have to implement the changes of the registers 
-	//at the stage, assumingly in the run() method
 	return sp_registers[s][reg];
 }
 
 int sim_pipe::get_gp_register(unsigned reg){
 	return gp_registers[reg];
+}
+
+int sim_pipe::get_ir_reg(stage_t s){
+	return sp_registers[s][IR];
+}
+
+unsigned sim_pipe::get_inst(unsigned base_address){
+	unsigned instruction;
+	for(int i=0;i<4;i++)
+		instruction |= (inst_memory[base_address + i] << (3-i)*8);
+	return instruction;
 }
 
 void sim_pipe::set_gp_register(unsigned reg, int value){
@@ -145,9 +230,7 @@ void sim_pipe::print_inst_memory(unsigned start_address, unsigned end_address){
 
 void sim_pipe::write_memory(unsigned address, unsigned value){
 	//store to data memory in little endian at address
-	for(int i=0; i<4;i++){
-		data_memory[address + i] = (byte) (value >> 8*i);
-	}
+	for(int i=0; i<4;i++) data_memory[address + i] = (byte) (value >> 8*i);
 }
 
 void sim_pipe::print_registers(){
@@ -160,5 +243,20 @@ void sim_pipe::print_registers(){
 	}
 	cout << "General purpose registers:" << endl;
 	for (i=0; i< NUM_GP_REGISTERS; i++)
-		if (get_gp_register(i)!=UNDEFINED) cout << "R" << dec << i << " = " << get_gp_register(i) << hex << " / 0x" << get_gp_register(i) << endl;
+		if ((unsigned) get_gp_register(i)!= UNDEFINED) cout << "R" << dec << i << " = " << get_gp_register(i) << hex << " / 0x" << get_gp_register(i) << endl;
+}
+
+inst_t sim_pipe::get_inst_type(unsigned IR){
+	opcode_t op = OPCODE(IR);
+	if((op == ADDI) || (op == SUBI) || (op == XORI) || (op == ORI) || (op == ANDI))
+		return ARITH_I;
+	else if((op == LW) || (op == SW))
+		return MEMORY;
+	else if ((op >= ADD) && (op <= DIV))
+		return ARITH;
+	else if ((op >= BEQZ) && (op <= JUMP))
+		return BRANCH;
+	
+	cout << "Type: UNDEFINED" << endl;
+	return (inst_t) UNDEFINED;
 }

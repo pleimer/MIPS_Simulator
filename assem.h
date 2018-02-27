@@ -21,8 +21,8 @@ typedef unsigned char byte;
 #define OP_SIZE 6
 #define REG_REF_SIZE 5
 
-#define LABEL_MASK 0x1FFFFF
-#define IMM_MASK 0xFFFF
+#define LABEL_MASK 0x001FFFFF
+#define IMM_MASK 0x0000FFFF
 
 //typedef enum {LW, SW, ADD, ADDI, SUB, SUBI, XOR, BLTZ, BNEZ, EOP} opcode_t;
 
