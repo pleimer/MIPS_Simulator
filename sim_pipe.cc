@@ -8,8 +8,7 @@
 	make it such that address 0x10000000 is actually address 0 so we don't have to allocate so much memory
 	
 	Up Next: 
-		Implement run() - get the stages rolling!
-		Implement opcode control of A and B registers
+		Now, set all unused sp registers to undefined!
 */
 #include "sim_pipe.h"
 #include <stdlib.h>
@@ -105,11 +104,11 @@ void sim_pipe::run(unsigned cycles){
 				//EX
 				ex_ir = get_ir_reg(EX);
 				cout << "IR at EX is: " << hex << ex_ir << endl;
+				sp_registers[MEM][B] = sp_registers[EX][B];
 				switch(get_inst_type(ex_ir)){
 					case MEMORY:
 						sp_registers[MEM][IR] = sp_registers[EX][IR];
 						sp_registers[MEM][ALU_OUTPUT] = sp_registers[EX][A]  + sp_registers[EX][IMM];
-						sp_registers[MEM][B] = sp_registers[EX][B];
 						break;
 					case ARITH:
 						sp_registers[MEM][IR] = sp_registers[EX][IR];
@@ -174,7 +173,7 @@ void sim_pipe::run(unsigned cycles){
 				if((unsigned) sp_registers[ID][IR] != UNDEFINED){ 
 					sp_registers[EX][A] = gp_registers[RS(get_ir_reg(ID))];//(sp_registers[ID][IR] & RS_MASK) >> (INST_SIZE - OP_SIZE - REG_REF_SIZE*2)];//rs
 					if(get_inst_type(get_ir_reg(ID)) == ARITH) sp_registers[EX][B] = gp_registers[RT(get_ir_reg(ID))];//(sp_registers[ID][IR] & RT_MASK) >> (INST_SIZE - OP_SIZE - REG_REF_SIZE*3)];//rt
-					else if(get_inst_type(get_ir_reg(ID)) == MEMORY) sp_registers[EX][B] = gp_registers[RD(get_ir_reg(ID))];
+					else if(OPCODE(get_ir_reg(ID)) == SW) sp_registers[EX][B] = gp_registers[RD(get_ir_reg(ID))];
 					if((get_inst_type(get_ir_reg(ID)) == ARITH_I) || (get_inst_type(get_ir_reg(ID)) == MEMORY)){//immediate
 						if(get_ir_reg(ID) & IMM_SIGN) sp_registers[EX][IMM] = ((get_ir_reg(ID) & IMM_MASK) | IMM_SIGN_EXTEND);
 						else sp_registers[EX][IMM] = (get_ir_reg(ID) & IMM_MASK);
