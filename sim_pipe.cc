@@ -40,7 +40,7 @@ sim_pipe::sim_pipe(unsigned mem_size, unsigned mem_latency){
 	fill_n(data_memory, data_memory_size, 0xFF);
 	
 	//instruction memory
-	inst_memory_size = 256;
+	inst_memory_size = 128;
 	inst_memory = new byte[inst_memory_size];
 	fill_n(inst_memory,inst_memory_size, 0xFF);
 }
@@ -62,6 +62,7 @@ void sim_pipe::load_program(const char *filename, unsigned base_address){
 void sim_pipe::run(unsigned cycles){
 	//run for num clock cycles "cycles"
 	//if "cycles" is 0, run until EOP
+	int ex_ir;
 	
 	//for now, just number of clock cycles
 		for(unsigned int i=0; i<cycles;i++){ //each loop is a clock cycle
@@ -71,8 +72,8 @@ void sim_pipe::run(unsigned cycles){
 				//MEM
 		
 				//EX
-				int ex_ir = sp_registers[EX][IR];
-				switch(get_inst_type(ex_ir)){
+				ex_ir = get_inst_type(get_ir_reg(EX));
+				switch(ex_ir){
 					case MEMORY:
 						sp_registers[MEM][IR] = sp_registers[EX][IR];
 						sp_registers[MEM][ALU_OUTPUT] = sp_registers[EX][A]  + sp_registers[EX][IMM];
@@ -131,29 +132,34 @@ void sim_pipe::run(unsigned cycles){
 					case BRANCH:
 						
 						break;
+					default:
+						break;
 				}
 		
 				//ID 
 				if((unsigned) sp_registers[ID][IR] != UNDEFINED){ 
 					sp_registers[EX][A] = gp_registers[(sp_registers[ID][IR] & RS_MASK) >> (INST_SIZE - OP_SIZE - REG_REF_SIZE*2)];//rs
-					if(get_inst_type(sp_registers[ID][IR]) == ARITH) {
+					if(get_inst_type(get_ir_reg(ID)) == ARITH) {
 						sp_registers[EX][B] = gp_registers[(sp_registers[ID][IR] & RT_MASK) >> (INST_SIZE - OP_SIZE - REG_REF_SIZE*3)];//rt
 					}
-					if(get_ir_reg(ID) & IMM_SIGN) sp_registers[EX][IMM] = ((get_ir_reg(ID) & IMM_MASK) | IMM_SIGN_EXTEND);
-					else {
-						cout << "ID.IR is: " << hex << get_ir_reg(ID) << endl;
-						sp_registers[EX][IMM] = (get_ir_reg(ID) & IMM_MASK);
-						cout << "EX IMM is: " << sp_registers[EX][IMM] << endl;
+					if((get_inst_type(get_ir_reg(ID)) == ARITH_I) || (get_inst_type(get_ir_reg(ID)) == MEMORY)){//immediate
+						if(get_ir_reg(ID) & IMM_SIGN) sp_registers[EX][IMM] = ((get_ir_reg(ID) & IMM_MASK) | IMM_SIGN_EXTEND);
+						else {
+							cout << "ID.IR is: " << hex << get_ir_reg(ID) << endl;
+							cout << "Instruction Mem is: " << hex << get_inst(0) << endl;
+							sp_registers[EX][IMM] = (get_ir_reg(ID) & IMM_MASK);
+						}
 					}
+					sp_registers[EX][NPC] = sp_registers[ID][NPC];
+					sp_registers[EX][IR] = sp_registers[ID][IR];
 				}
-				//cout << "IR is: " << hex << get_ir_reg(ID);
-
-				sp_registers[EX][NPC] = sp_registers[ID][NPC];
-				sp_registers[EX][IR] = sp_registers[ID][IR];
-				//cout << "EX.IR is: " << hex << get_ir_reg(ID) << endl;
+				//cout << "HEY"; somehow inserting this fixes my problem
 			
 				//IF
 				sp_registers[ID][IR] = get_inst(sp_registers[IF][PC] - 0x10000000);
+				cout << "Instruction Mem in IF w/ offset is: " << hex << get_inst(sp_registers[IF][PC] - 0x10000000) << endl;
+				cout << "ID.IR in IF: " << hex << get_ir_reg(ID) << endl;
+				cout << "Instruction Mem in IF is: " << hex << get_inst(0) << endl;
 				sp_registers[ID][NPC] = sp_registers[IF][PC] + 4;
 				sp_registers[IF][PC] +=4; 
 		}
@@ -181,11 +187,23 @@ int sim_pipe::get_ir_reg(stage_t s){
 	return sp_registers[s][IR];
 }
 
-unsigned sim_pipe::get_inst(unsigned base_address){
-	unsigned instruction;
+int sim_pipe::get_inst(unsigned base_address){
+	int instruction;
 	for(int i=0;i<4;i++)
 		instruction |= (inst_memory[base_address + i] << (3-i)*8);
 	return instruction;
+}
+
+int sim_pipe::get_inst_type(int inst){
+	if((OPCODE(inst) == ADDI) || (OPCODE(inst) == SUBI) || (OPCODE(inst) == XORI) || (OPCODE(inst) == ORI) || (OPCODE(inst) == ANDI))
+		return ARITH_I;
+	else if((OPCODE(inst) == LW) || (OPCODE(inst) == SW))
+		return MEMORY;
+	else if ((OPCODE(inst) >= ADD) && (OPCODE(inst) <= DIV))
+		return ARITH;
+	else if ((OPCODE(inst) >= BEQZ) && (OPCODE(inst) <= JUMP))
+		return BRANCH;
+	return UNDEF_INST;
 }
 
 void sim_pipe::set_gp_register(unsigned reg, int value){
@@ -246,17 +264,3 @@ void sim_pipe::print_registers(){
 		if ((unsigned) get_gp_register(i)!= UNDEFINED) cout << "R" << dec << i << " = " << get_gp_register(i) << hex << " / 0x" << get_gp_register(i) << endl;
 }
 
-inst_t sim_pipe::get_inst_type(unsigned IR){
-	opcode_t op = OPCODE(IR);
-	if((op == ADDI) || (op == SUBI) || (op == XORI) || (op == ORI) || (op == ANDI))
-		return ARITH_I;
-	else if((op == LW) || (op == SW))
-		return MEMORY;
-	else if ((op >= ADD) && (op <= DIV))
-		return ARITH;
-	else if ((op >= BEQZ) && (op <= JUMP))
-		return BRANCH;
-	
-	cout << "Type: UNDEFINED" << endl;
-	return (inst_t) UNDEFINED;
-}
