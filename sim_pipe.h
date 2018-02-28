@@ -32,6 +32,10 @@ typedef enum {IF, ID, EX, MEM, WB} stage_t;
 
 
 class sim_pipe{
+	
+	unsigned mem_latency;
+	unsigned clock_cycles;
+	unsigned inst_executed;
 
 	/* Add the data members required by your simulator's implementation here */
 	int *gp_registers;

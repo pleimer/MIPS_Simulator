@@ -1,14 +1,14 @@
 /*
-	To do: Implement the rest of the instructions
-	Implement data flow
+	To do: 
+	Implement the rest of the instructions
+	
+	Implement memory fetch delay
+	
+	CPI, instructions executed, IPC
+
 	Add hazard handling
 	
-	figure out what to do with stages for get_sp_register()!
-	
-	make it such that address 0x10000000 is actually address 0 so we don't have to allocate so much memory
-	
 	Up Next: 
-		Now, run to completeion!
 		
 */
 #include "sim_pipe.h"
@@ -23,6 +23,10 @@ static const char *reg_names[NUM_SP_REGISTERS] = {"PC", "NPC", "IR", "A", "B", "
 static const char *stage_names[NUM_STAGES] = {"IF", "ID", "EX", "MEM", "WB"};
 
 sim_pipe::sim_pipe(unsigned mem_size, unsigned mem_latency){
+	
+	this->mem_latency = mem_latency;
+	this->inst_executed = 0;
+	this->clock_cycles = 0;
 	
 	//allocate memory
 	//sp registers
@@ -63,10 +67,8 @@ void sim_pipe::run(unsigned cycles){
 	//run for num clock cycles "cycles"
 	//if "cycles" is 0, run until EOP
 	
-	//for now, just number of clock cycles
 	if(cycles == 0) while(pipeline());
-	else for(unsigned int i=0; i<cycles;i++){ pipeline();}
-		
+	else for(unsigned int i=0; i<cycles;i++){ pipeline();}	
 }
 
 bool sim_pipe::pipeline(){
@@ -74,6 +76,8 @@ bool sim_pipe::pipeline(){
 	
 	//WB - store result or data to rd
 	cout << "IR at WB is: " << hex << get_ir_reg(WB) << endl;
+	//if WB.LMD or WB.ALU_OUTPUT is defined, instruction has completed
+	if((sp_registers[WB][LMD] != UNDEFINED) || (sp_registers[WB][ALU_OUTPUT] != UNDEFINED)) ++inst_executed;
 	switch(get_inst_type(get_ir_reg(WB))){
 		case ARITH:
 			gp_registers[RD(get_ir_reg(WB))] = sp_registers[WB][ALU_OUTPUT];
@@ -86,7 +90,7 @@ bool sim_pipe::pipeline(){
 			break;
 		default: 
 			if(OPCODE(get_ir_reg(ID)) == EOP){
-				final_cycles++;
+				++final_cycles;
 				if(final_cycles > 2) return false;
 			}
 			break;
@@ -202,7 +206,7 @@ bool sim_pipe::pipeline(){
 	sp_registers[ID][IR] = get_inst(sp_registers[IF][PC] - 0x10000000);
 	if(OPCODE(get_ir_reg(ID)) != EOP){
 		cout << "IR at IF is: " << hex << get_ir_reg(ID) << endl;
-		if((get_inst_type(get_ir_reg(MEM)) == BRANCH) && sp_registers[MEM][COND] && (sp_registers[MEM][COND] != (unsigned) UNDEFINED)){
+		if((get_inst_type(get_ir_reg(MEM)) == BRANCH) && sp_registers[MEM][COND] && ((unsigned) sp_registers[MEM][COND] != UNDEFINED)){
 			sp_registers[ID][NPC] = sp_registers[MEM][ALU_OUTPUT];
 			sp_registers[IF][PC] = sp_registers[MEM][ALU_OUTPUT];
 		}
@@ -212,7 +216,8 @@ bool sim_pipe::pipeline(){
 		}
 	}
 	else sp_registers[ID][NPC] = sp_registers[IF][PC];
-
+	
+	++clock_cycles;
 	return true;
 }
 	
@@ -262,19 +267,20 @@ void sim_pipe::set_gp_register(unsigned reg, int value){
 }
 
 float sim_pipe::get_IPC(){
-	return 0; //please modify
+	float IPC = (float)inst_executed/(float)clock_cycles;
+	return IPC;
 }
 
 unsigned sim_pipe::get_instructions_executed(){
-	return 0; //please modify
+	return inst_executed;
 }
 
 unsigned sim_pipe::get_stalls(){
-	return 0; //please modify
+	return 0;
 }
 
 unsigned sim_pipe::get_clock_cycles(){
-	return 0; //please modify
+	return clock_cycles; //please modify
 }
 
 void sim_pipe::print_memory(unsigned start_address, unsigned end_address){
