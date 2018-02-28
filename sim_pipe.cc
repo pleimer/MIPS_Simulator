@@ -4,7 +4,7 @@
 	
 	Implement memory fetch delay
 	
-	CPI, instructions executed, IPC
+	Now, add data hazard handling
 
 	Add hazard handling
 	
@@ -27,6 +27,8 @@ sim_pipe::sim_pipe(unsigned mem_size, unsigned mem_latency){
 	this->mem_latency = mem_latency;
 	this->inst_executed = 0;
 	this->clock_cycles = 0;
+	this->num_NOPS = 0;
+	this->total_NOPS = 0;
 	
 	//allocate memory
 	//sp registers
@@ -75,7 +77,7 @@ bool sim_pipe::pipeline(){
 	int ex_ir, mem_ir;
 	
 	//WB - store result or data to rd
-	cout << "IR at WB is: " << hex << get_ir_reg(WB) << endl;
+	cout << endl << "IR at WB is: " << hex << get_ir_reg(WB) << endl;
 	//if WB.LMD or WB.ALU_OUTPUT is defined, instruction has completed
 	if((sp_registers[WB][LMD] != UNDEFINED) || (sp_registers[WB][ALU_OUTPUT] != UNDEFINED)) ++inst_executed;
 	switch(get_inst_type(get_ir_reg(WB))){
@@ -86,12 +88,11 @@ bool sim_pipe::pipeline(){
 			gp_registers[RD(get_ir_reg(WB))] = sp_registers[WB][ALU_OUTPUT];
 			break;
 		case MEMORY:
-			if(OPCODE(get_ir_reg(WB)) == LW) gp_registers[RD(get_ir_reg(WB))] = sp_registers[WB][LMD]; //this needs to go to RT instead, or B
+			if(OPCODE(get_ir_reg(WB)) == LW) gp_registers[RD(get_ir_reg(WB))] = sp_registers[WB][LMD]; 
 			break;
 		default: 
-			if(OPCODE(get_ir_reg(ID)) == EOP){
-				++final_cycles;
-				if(final_cycles > 2) return false;
+			if(OPCODE(get_ir_reg(WB)) == EOP){
+				return false;
 			}
 			break;
 	}
@@ -100,20 +101,21 @@ bool sim_pipe::pipeline(){
 	fill_n(sp_registers[WB], NUM_SP_REGISTERS, UNDEFINED);
 	mem_ir = get_ir_reg(MEM);
 	cout << "IR at MEM is: " << hex << mem_ir << endl;
+	sp_registers[WB][IR] = get_ir_reg(MEM);
 	switch(get_inst_type(mem_ir)){
 		case MEMORY:
 			sp_registers[WB][ALU_OUTPUT] = sp_registers[MEM][ALU_OUTPUT];
-			sp_registers[WB][IR] = get_ir_reg(MEM);
+			//sp_registers[WB][IR] = get_ir_reg(MEM);
 			if(OPCODE(mem_ir) == LW) sp_registers[WB][LMD] = read_memory(sp_registers[MEM][ALU_OUTPUT]);
 			else if (OPCODE(mem_ir) == SW) write_memory(sp_registers[MEM][ALU_OUTPUT], sp_registers[MEM][B]);
 			break;
 		case ARITH:
 			sp_registers[WB][ALU_OUTPUT] = sp_registers[MEM][ALU_OUTPUT];
-			sp_registers[WB][IR] = get_ir_reg(MEM);
+			//sp_registers[WB][IR] = get_ir_reg(MEM);
 			break;
 		case ARITH_I:
 			sp_registers[WB][ALU_OUTPUT] = sp_registers[MEM][ALU_OUTPUT];
-			sp_registers[WB][IR] = get_ir_reg(MEM);
+			//sp_registers[WB][IR] = get_ir_reg(MEM);
 			break;
 		default:
 			break;
@@ -124,9 +126,10 @@ bool sim_pipe::pipeline(){
 	ex_ir = get_ir_reg(EX);
 	cout << "IR at EX is: " << hex << ex_ir << endl;
 	sp_registers[MEM][B] = sp_registers[EX][B];
+	sp_registers[MEM][IR] = sp_registers[EX][IR];
 	switch(get_inst_type(ex_ir)){
 		case MEMORY:
-			sp_registers[MEM][IR] = sp_registers[EX][IR];
+			//sp_registers[MEM][IR] = sp_registers[EX][IR];
 			sp_registers[MEM][ALU_OUTPUT] = sp_registers[EX][A]  + sp_registers[EX][IMM];
 			break;
 		case ARITH:
@@ -158,7 +161,7 @@ bool sim_pipe::pipeline(){
 			}
 			break;
 		case ARITH_I:
-			sp_registers[MEM][IR] = sp_registers[EX][IR];
+			//sp_registers[MEM][IR] = sp_registers[EX][IR];
 			switch(OPCODE(ex_ir)){
 				case ADDI:
 					sp_registers[MEM][ALU_OUTPUT] = sp_registers[EX][A] + sp_registers[EX][IMM];
@@ -188,34 +191,39 @@ bool sim_pipe::pipeline(){
 	}
 
 	//ID 
-	fill_n(sp_registers[EX], NUM_SP_REGISTERS, UNDEFINED);
-	cout << "IR at ID is: " << hex << get_ir_reg(ID) << endl;
-
-	sp_registers[EX][A] = gp_registers[RS(get_ir_reg(ID))];
-	if(get_inst_type(get_ir_reg(ID)) == ARITH) sp_registers[EX][B] = gp_registers[RT(get_ir_reg(ID))];
-	else if(OPCODE(get_ir_reg(ID)) == SW) sp_registers[EX][B] = gp_registers[RD(get_ir_reg(ID))];
-	if((get_inst_type(get_ir_reg(ID)) == ARITH_I) || (get_inst_type(get_ir_reg(ID)) == MEMORY)){//immediate
-		if(get_ir_reg(ID) & IMM_SIGN) sp_registers[EX][IMM] = ((get_ir_reg(ID) & IMM_MASK) | IMM_SIGN_EXTEND);
-		else sp_registers[EX][IMM] = (get_ir_reg(ID) & IMM_MASK);
-	}
-	sp_registers[EX][NPC] = sp_registers[ID][NPC];
-	sp_registers[EX][IR] = sp_registers[ID][IR];
+	
+	if(isHazard()) insert_NOP(); //handle hazards
+	else{
+		cout << "IR at ID is: " << hex << get_ir_reg(ID) << endl;
+		fill_n(sp_registers[EX], NUM_SP_REGISTERS, UNDEFINED);
+		
+		if((get_inst_type(get_ir_reg(ID)) == ARITH) || (get_inst_type(get_ir_reg(ID)) == ARITH_I) || (get_inst_type(get_ir_reg(ID)) == MEMORY))sp_registers[EX][A] = gp_registers[RS(get_ir_reg(ID))]; 
+		if(get_inst_type(get_ir_reg(ID)) == ARITH){ sp_registers[EX][B] = gp_registers[RT(get_ir_reg(ID))];}
+		else if(OPCODE(get_ir_reg(ID)) == SW) sp_registers[EX][B] = gp_registers[RD(get_ir_reg(ID))]; //in RD pos, but actually RT
+		
+		if((get_inst_type(get_ir_reg(ID)) == ARITH_I) || (get_inst_type(get_ir_reg(ID)) == MEMORY)){//immediate
+			if(get_ir_reg(ID) & IMM_SIGN) sp_registers[EX][IMM] = ((get_ir_reg(ID) & IMM_MASK) | IMM_SIGN_EXTEND);
+			else sp_registers[EX][IMM] = (get_ir_reg(ID) & IMM_MASK);
+		}
+		sp_registers[EX][NPC] = sp_registers[ID][NPC];
+		sp_registers[EX][IR] = sp_registers[ID][IR];
 
 	//IF
-	fill_n(sp_registers[ID], NUM_SP_REGISTERS, UNDEFINED);
-	sp_registers[ID][IR] = get_inst(sp_registers[IF][PC] - 0x10000000);
-	if(OPCODE(get_ir_reg(ID)) != EOP){
-		cout << "IR at IF is: " << hex << get_ir_reg(ID) << endl;
-		if((get_inst_type(get_ir_reg(MEM)) == BRANCH) && sp_registers[MEM][COND] && ((unsigned) sp_registers[MEM][COND] != UNDEFINED)){
-			sp_registers[ID][NPC] = sp_registers[MEM][ALU_OUTPUT];
-			sp_registers[IF][PC] = sp_registers[MEM][ALU_OUTPUT];
+		fill_n(sp_registers[ID], NUM_SP_REGISTERS, UNDEFINED);
+		sp_registers[ID][IR] = get_inst(sp_registers[IF][PC] - 0x10000000);
+		if(OPCODE(get_ir_reg(ID)) != EOP){
+			cout << "IR at IF is: " << hex << get_ir_reg(ID) << endl;
+			if((get_inst_type(get_ir_reg(MEM)) == BRANCH) && sp_registers[MEM][COND] && (sp_registers[MEM][COND] != UNDEFINED)){
+				sp_registers[ID][NPC] = sp_registers[MEM][ALU_OUTPUT];
+				sp_registers[IF][PC] = sp_registers[MEM][ALU_OUTPUT];
+			}
+			else{
+				sp_registers[ID][NPC] = sp_registers[IF][PC] + 4;
+				sp_registers[IF][PC] +=4;
+			}
 		}
-		else{
-			sp_registers[ID][NPC] = sp_registers[IF][PC] + 4;
-			sp_registers[IF][PC] +=4;
-		}
+		else sp_registers[ID][NPC] = sp_registers[IF][PC];
 	}
-	else sp_registers[ID][NPC] = sp_registers[IF][PC];
 	
 	++clock_cycles;
 	return true;
@@ -276,7 +284,7 @@ unsigned sim_pipe::get_instructions_executed(){
 }
 
 unsigned sim_pipe::get_stalls(){
-	return 0;
+	return total_NOPS;
 }
 
 unsigned sim_pipe::get_clock_cycles(){
@@ -294,13 +302,19 @@ void sim_pipe::print_memory(unsigned start_address, unsigned end_address){
 }
 
 void sim_pipe::print_inst_memory(unsigned start_address, unsigned end_address){
+	std::ofstream out("assem_out.txt");
+    std::streambuf *coutbuf = std::cout.rdbuf(); 
+    std::cout.rdbuf(out.rdbuf()); 
+	
 	cout << "inst_memory[0x" << hex << setw(8) << setfill('0') << start_address << ":0x" << hex << setw(8) << setfill('0') <<  end_address << "]" << endl;
 	unsigned i;
 	for (i=start_address; i<end_address; i++){
 		if (i%4 == 0) cout << "0x" << hex << setw(8) << setfill('0') << i << ": "; 
 		cout << hex << setw(2) << setfill('0') << int(inst_memory[i]) << " ";
 		if (i%4 == 3) cout << endl;
-	} 
+	}
+	std::cout.rdbuf(coutbuf);
+	
 }
 
 void sim_pipe::write_memory(unsigned address, unsigned value){
@@ -321,10 +335,87 @@ void sim_pipe::print_registers(){
 	for (s=0; s<NUM_STAGES; s++){
 		cout << "Stage: " << stage_names[s] << endl;  
 		for (i=0; i< NUM_SP_REGISTERS; i++)
-			if ((sp_register_t)i != IR && (sp_register_t)i != COND && get_sp_register((sp_register_t)i, (stage_t)s)!=UNDEFINED) cout << reg_names[i] << " = " << dec <<  get_sp_register((sp_register_t)i, (stage_t)s) << hex << " / 0x" << get_sp_register((sp_register_t)i, (stage_t)s) << endl;
+			if ((sp_register_t)i != IR && (sp_register_t)i != COND && get_sp_register((sp_register_t)i, (stage_t)s)!= (unsigned)UNDEFINED) cout << reg_names[i] << " = " << dec <<  get_sp_register((sp_register_t)i, (stage_t)s) << hex << " / 0x" << get_sp_register((sp_register_t)i, (stage_t)s) << endl;
 	}
 	cout << "General purpose registers:" << endl;
 	for (i=0; i< NUM_GP_REGISTERS; i++)
-		if ((unsigned) get_gp_register(i)!= UNDEFINED) cout << "R" << dec << i << " = " << get_gp_register(i) << hex << " / 0x" << get_gp_register(i) << endl;
+		if (get_gp_register(i)!= UNDEFINED) cout << "R" << dec << i << " = " << get_gp_register(i) << hex << " / 0x" << get_gp_register(i) << endl;
+}
+
+bool sim_pipe::isHazard(){
+	//data hazard
+	
+	int op_id = OPCODE(get_ir_reg(ID));
+	int op_ex = OPCODE(get_ir_reg(EX));
+	int op_mem = OPCODE(get_ir_reg(MEM));
+	int id_rt_sw = RD(get_ir_reg(ID)); //special case for SW since RT position is different
+	int id_rs = RS(get_ir_reg(ID));
+	int id_rt = RT(get_ir_reg(ID));
+	int ex_rd = RD(get_ir_reg(MEM));
+	int mem_rd =  RD(get_ir_reg(WB));
+	
+	//data hazard ID-EX
+	if((get_ir_reg(EX) != UNDEFINED) && (op_id != EOP) && (op_ex != NOP)){
+		if(op_id == SW){
+			if( (id_rt_sw == ex_rd)){
+					cout << "EOP inserted bc SW" << endl;
+					num_NOPS = mem_latency + 2;
+					return true;
+			}
+			if(num_NOPS > 0){
+				cout << "EOP inserted bc num_NOPS" << endl;
+				return true;
+			}
+			return false;
+		}
+		cout << "id_rs: " << hex << id_rs << endl;
+		cout << "ex_rd: " << hex << ex_rd << endl;
+
+		if( (((id_rs == ex_rd)|| (id_rt == ex_rd))) && (op_ex != SW)){
+			num_NOPS = mem_latency + 2;
+			cout << "EOP inserted bc RD in ARITH" << endl;
+			return true;
+		}
+	}
+	
+	//data hazard ID-MEM
+	if((get_ir_reg(MEM) != UNDEFINED) && (op_id != EOP) && (op_mem != NOP)){
+		if(op_id == SW){
+			if( (id_rt_sw == mem_rd)){
+					cout << "EOP inserted bc SW" << endl;
+					num_NOPS = mem_latency + 1;
+					return true;
+			}
+			if(num_NOPS > 0){
+				cout << "EOP inserted bc num_NOPS" << endl;
+				return true;
+			}
+			return false;
+		}
+		cout << "id_rs: " << hex << id_rs << endl;
+		cout << "mem_rd: " << hex << mem_rd << endl;
+		if( (((id_rs == mem_rd)|| (id_rt == mem_rd))) && (op_mem != SW)){
+			num_NOPS = mem_latency + 1;
+			cout << "EOP inserted bc RD in ARITH" << endl;
+			return true;
+		}
+	}
+
+	if(num_NOPS > 0){
+		cout << "EOP inserted bc num_NOPS" << endl;
+		return true;
+	}
+	
+	return false;
+}
+
+void sim_pipe::insert_NOP(){
+	//unsigned pos = (unsigned)log2((unsigned) NOP);
+	cout << "IR at ID is: " << hex << get_ir_reg(ID) << endl;
+	cout << "IR at IF is: " << hex << get_ir_reg(ID) << endl;
+	num_NOPS--;
+	total_NOPS++;
+	fill_n(sp_registers[EX], NUM_SP_REGISTERS, UNDEFINED);
+	sp_registers[EX][IR] = (NOP << (INST_SIZE - OP_SIZE));
 }
 

@@ -2,9 +2,10 @@
 #define SIM_PIPE_H_
 
 #include <stdio.h>
+#include <math.h>
 #include "assem.h"
 
-#define UNDEFINED 0xFFFFFFFF //constant used to initialize registers
+#define UNDEFINED (signed)0xFFFFFFFF //constant used to initialize registers
 #define NUM_SP_REGISTERS 9
 #define NUM_GP_REGISTERS 32
 #define NUM_OPCODES 23
@@ -36,6 +37,8 @@ class sim_pipe{
 	unsigned mem_latency;
 	unsigned clock_cycles;
 	unsigned inst_executed;
+	unsigned num_NOPS; //keeps track of NOPS to insert
+	unsigned total_NOPS;
 
 	/* Add the data members required by your simulator's implementation here */
 	int *gp_registers;
@@ -53,9 +56,6 @@ class sim_pipe{
 	
 	//assembler declaration
 	assembler as;
-	
-	//for pipeline control
-	unsigned final_cycles;
 
 public:
 
@@ -141,6 +141,12 @@ public:
 	
 	//get instruction type from IR register
 	int get_inst_type(int inst);
+	
+	//detect hazards
+	bool isHazard();
+	
+	//inject NOP into pipeline
+	void insert_NOP();
 
 };
 
