@@ -87,6 +87,13 @@ public:
 	
 	bool pipeline(); //contains the pipeline logic
 	
+	void exec_IF();
+	void exec_ID();
+	void exec_EX();
+	void exec_MEM();
+	bool exec_WB();
+	
+	
 	void reset();
 
 	// returns value of the specified special purpose register for a given stage (at the "entrance" of that stage)
@@ -109,6 +116,9 @@ public:
 	
 	//returns ir register for stage
 	int get_ir_reg(stage_t s);
+	
+	//returns PC in IF stage
+	int get_PC();
 
 	// set the value of the given general purpose register to "value"
 	void set_gp_register(unsigned reg, int value);
