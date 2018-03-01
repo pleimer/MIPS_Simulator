@@ -60,6 +60,7 @@ class sim_pipe{
 	
 	//hazard type
 	hazard_t hazard_type;
+	bool hazard;
 
 public:
 
