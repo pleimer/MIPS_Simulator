@@ -30,6 +30,7 @@ typedef enum {LW, SW, ADD, ADDI, SUB, SUBI, XOR, XORI, OR, ORI, AND, ANDI, MULT,
 typedef enum {ARITH_I, ARITH, MEMORY, BRANCH, UNDEF_INST} inst_t;
 
 typedef enum {IF, ID, EX, MEM, WB} stage_t;
+typedef enum {DATA, CONTROL, STRUCTURAL} hazard_t;
 
 
 class sim_pipe{
@@ -56,6 +57,9 @@ class sim_pipe{
 	
 	//assembler declaration
 	assembler as;
+	
+	//hazard type
+	hazard_t hazard_type;
 
 public:
 

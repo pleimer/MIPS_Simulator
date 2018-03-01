@@ -211,8 +211,8 @@ bool sim_pipe::pipeline(){
 	//IF
 		fill_n(sp_registers[ID], NUM_SP_REGISTERS, UNDEFINED);
 		sp_registers[ID][IR] = get_inst(sp_registers[IF][PC] - 0x10000000);
+		cout << "IR at IF is: " << hex << get_ir_reg(ID) << endl;
 		if(OPCODE(get_ir_reg(ID)) != EOP){
-			cout << "IR at IF is: " << hex << get_ir_reg(ID) << endl;
 			if((get_inst_type(get_ir_reg(MEM)) == BRANCH) && sp_registers[MEM][COND] && (sp_registers[MEM][COND] != UNDEFINED)){
 				sp_registers[ID][NPC] = sp_registers[MEM][ALU_OUTPUT];
 				sp_registers[IF][PC] = sp_registers[MEM][ALU_OUTPUT];
@@ -360,10 +360,12 @@ bool sim_pipe::isHazard(){
 			if( (id_rt_sw == ex_rd)){
 					cout << "EOP inserted bc SW" << endl;
 					num_NOPS = mem_latency + 2;
+					hazard_type = DATA;
 					return true;
 			}
 			if(num_NOPS > 0){
 				cout << "EOP inserted bc num_NOPS" << endl;
+				hazard_type = DATA;
 				return true;
 			}
 			return false;
@@ -374,6 +376,7 @@ bool sim_pipe::isHazard(){
 		if( (((id_rs == ex_rd)|| (id_rt == ex_rd))) && (op_ex != SW)){
 			num_NOPS = mem_latency + 2;
 			cout << "EOP inserted bc RD in ARITH" << endl;
+			hazard_type = DATA;
 			return true;
 		}
 	}
@@ -384,10 +387,12 @@ bool sim_pipe::isHazard(){
 			if( (id_rt_sw == mem_rd)){
 					cout << "EOP inserted bc SW" << endl;
 					num_NOPS = mem_latency + 1;
+					hazard_type = DATA;
 					return true;
 			}
 			if(num_NOPS > 0){
 				cout << "EOP inserted bc num_NOPS" << endl;
+				hazard_type = DATA;
 				return true;
 			}
 			return false;
@@ -397,8 +402,17 @@ bool sim_pipe::isHazard(){
 		if( (((id_rs == mem_rd)|| (id_rt == mem_rd))) && (op_mem != SW)){
 			num_NOPS = mem_latency + 1;
 			cout << "EOP inserted bc RD in ARITH" << endl;
+			hazard_type = DATA;
 			return true;
 		}
+	}
+	
+	//control hazard
+	if(get_inst_type(get_ir_reg(ID)) == BRANCH){
+			num_NOPS = mem_latency + 2;
+			cout << "EOP inserted bc control hazard" << endl;
+			hazard_type = CONTROL;
+			return true;
 	}
 
 	if(num_NOPS > 0){
@@ -416,6 +430,15 @@ void sim_pipe::insert_NOP(){
 	num_NOPS--;
 	total_NOPS++;
 	fill_n(sp_registers[EX], NUM_SP_REGISTERS, UNDEFINED);
-	sp_registers[EX][IR] = (NOP << (INST_SIZE - OP_SIZE));
+	switch(hazard_type){
+		case DATA: 
+			sp_registers[EX][IR] = (NOP << (INST_SIZE - OP_SIZE));
+			break;
+		case CONTROL:
+			sp_registers[EX][IR] = get_ir_reg(ID);
+			sp_registers[ID][IR] = (NOP << (INST_SIZE - OP_SIZE));
+			break;
+		default: break;
+	}
 }
 
