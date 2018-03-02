@@ -40,6 +40,8 @@ class sim_pipe{
 	unsigned inst_executed;
 	unsigned num_NOPS; //keeps track of NOPS to insert
 	unsigned total_NOPS;
+	
+	int mem_latency_tracker;
 
 	/* Add the data members required by your simulator's implementation here */
 	int *gp_registers;

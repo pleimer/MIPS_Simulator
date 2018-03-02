@@ -29,6 +29,7 @@ sim_pipe::sim_pipe(unsigned mem_size, unsigned mem_latency){
 	this->clock_cycles = 0;
 	this->num_NOPS = 0;
 	this->total_NOPS = 0;
+	this->mem_latency_tracker = mem_latency;
 	
 	//allocate memory
 	//sp registers
@@ -93,11 +94,11 @@ bool sim_pipe::pipeline(){
 	exec_IF();	
 	cout << endl << "IR registers after clock cycle: " << endl;
 
-	for(int i=WB;i != IF;i--){
+	/*for(int i=WB;i != IF;i--){
 		cout << stage_names[i] << ": " << hex <<  get_ir_reg((stage_t)i) << endl;
 	}
 	int inst = get_inst(sp_registers[IF][PC] - 0x10000000);
-	cout << "PC -> " <<  inst << endl << endl;
+	cout << "PC -> " <<  inst << endl << endl;*/
 	
 	
 	++clock_cycles;
@@ -243,31 +244,40 @@ void sim_pipe::exec_EX(){
 
 
 void sim_pipe::exec_MEM(){
-	int mem_ir;
-	mem_ir = get_ir_reg(MEM);
-	cout << "IR at MEM is: " << hex << mem_ir << endl;
-	sp_registers[WB][IR] = get_ir_reg(MEM); //propagate IR to next stage
-	
-	switch(get_inst_type(mem_ir)){
-		case MEMORY:
-			sp_registers[WB][ALU_OUTPUT] = sp_registers[MEM][ALU_OUTPUT];
-			//sp_registers[WB][IR] = get_ir_reg(MEM);
-			if(OPCODE(mem_ir) == LW) sp_registers[WB][LMD] = read_memory(sp_registers[MEM][ALU_OUTPUT]);
-			else if (OPCODE(mem_ir) == SW) write_memory(sp_registers[MEM][ALU_OUTPUT], sp_registers[MEM][B]);
-			break;
-		case ARITH:
-			sp_registers[WB][ALU_OUTPUT] = sp_registers[MEM][ALU_OUTPUT];
-			//sp_registers[WB][IR] = get_ir_reg(MEM);
-			break;
-		case ARITH_I:
-			sp_registers[WB][ALU_OUTPUT] = sp_registers[MEM][ALU_OUTPUT];
-			//sp_registers[WB][IR] = get_ir_reg(MEM);
-			break;
-		case BRANCH:
-			break;
-		default:
-			break;
-	}
+		int mem_ir;
+		mem_ir = get_ir_reg(MEM);
+		cout << "IR at MEM is: " << hex << mem_ir << endl;
+		sp_registers[WB][IR] = get_ir_reg(MEM); //propagate IR to next stage
+		
+		switch(get_inst_type(mem_ir)){
+			case MEMORY:
+					//doesn't execute until after mem_latncy cycles
+				if(!mem_latency_tracker){
+					sp_registers[WB][ALU_OUTPUT] = sp_registers[MEM][ALU_OUTPUT];
+					//sp_registers[WB][IR] = get_ir_reg(MEM);
+					if(OPCODE(mem_ir) == LW) sp_registers[WB][LMD] = read_memory(sp_registers[MEM][ALU_OUTPUT]);
+					else if (OPCODE(mem_ir) == SW) write_memory(sp_registers[MEM][ALU_OUTPUT], sp_registers[MEM][B]);
+				}
+				else {
+					num_NOPS += mem_latency ;
+					hazard_type = STRUCTURAL;
+					insert_NOP();
+					mem_latency_tracker--;
+				}
+				break;
+			case ARITH:
+				sp_registers[WB][ALU_OUTPUT] = sp_registers[MEM][ALU_OUTPUT];
+				//sp_registers[WB][IR] = get_ir_reg(MEM);
+				break;
+			case ARITH_I:
+				sp_registers[WB][ALU_OUTPUT] = sp_registers[MEM][ALU_OUTPUT];
+				//sp_registers[WB][IR] = get_ir_reg(MEM);
+				break;
+			case BRANCH:
+				break;
+			default:
+				break;
+		}
 }
 
 
@@ -414,6 +424,7 @@ void sim_pipe::print_registers(){
 }
 
 bool sim_pipe::isHazard(){
+
 	//data hazard
 	int op_id = OPCODE(get_ir_reg(ID));
 	int op_ex = OPCODE(get_ir_reg(EX)); // MEM because of way pipeline is set up -> don't ask questions
@@ -426,49 +437,52 @@ bool sim_pipe::isHazard(){
 	
 	//data hazard ID-EX
 	if((get_ir_reg(EX) != UNDEFINED) && (op_id != EOP) && (op_ex != NOP)){
-		if(op_id == SW){
-			if(num_NOPS > 0){
-				cout << "EOP inserted bc num_NOPS" << endl;
-				hazard_type = DATA;
-				return true;
-			}
+		if((op_id == SW) ){
 			if( (id_rt_sw == ex_rd)){
-					cout << "EOP inserted bc SW" << endl;
+					cout << "EOP inserted bc SW in EX" << endl;
 					num_NOPS = mem_latency + 2;
 					hazard_type = DATA;
-					return true;
+			}
+		}
+		else if ((op_id == LW) ){
+			if( (id_rs == ex_rd)){
+				cout << "EOP inserted bc LW in EX" << endl;
+				num_NOPS = mem_latency + 2;
+				hazard_type = DATA;
 			}
 		}
 
 		if( (((id_rs == ex_rd)|| (id_rt == ex_rd))) && (op_ex != SW)){
-			num_NOPS = mem_latency + 2;
+			num_NOPS =  mem_latency + 2;
 			cout << "id_rs: " << id_rs << endl;
 			cout << "id_rt: " << id_rt << endl;
 			cout << "ex_rd: " << ex_rd << endl;
 			cout << "EX.IR is: " << get_ir_reg(EX) << endl;
 			cout << "EOP inserted bc RD in ARITH in EX" << endl;
 			hazard_type = DATA;
-			return true;
 		}
 	}
 	
 	//data hazard ID-MEM
 	if((get_ir_reg(MEM) != UNDEFINED) && (op_id != EOP) && (op_mem != NOP)){
-		if(num_NOPS > 0){
-			cout << "EOP inserted bc num_NOPS" << endl;
-			hazard_type = DATA;
-			return true;
-		}
-		if(op_id == SW){
+		if((op_id == SW) ){
 			cout << "id_rt_sw: " << id_rt_sw << endl;
 			cout << "mem_rd: " << mem_rd << endl;
 			if( (id_rt_sw == mem_rd)){
 					cout << "EOP inserted bc SW at MEM" << endl;
 					num_NOPS = mem_latency + 1;
 					hazard_type = DATA;
-					return true;
 			}
 		}
+		else if ((op_id == LW) ){
+			if( (id_rs == mem_rd)){
+				cout << "EOP inserted bc LW in MEM" << endl;
+				num_NOPS = mem_latency + 1;
+				hazard_type = DATA;
+				
+			}
+		}
+		
 		if( (((id_rs == mem_rd)|| (id_rt == mem_rd))) && (op_mem != SW)){
 			num_NOPS = mem_latency + 1;
 			cout << "id_rs: " << id_rs << endl;
@@ -477,23 +491,22 @@ bool sim_pipe::isHazard(){
 			cout << "op_mem: " << op_mem << endl;
 			cout << "EOP inserted bc RD in ARITH in MEM" << endl;
 			hazard_type = DATA;
-			return true;
 		}
 	}
 	
-	//control hazard
+		//control hazard
 	if(get_inst_type(get_ir_reg(ID)) == BRANCH){
-			num_NOPS = mem_latency + 2;
+			num_NOPS = 2;
 			cout << "EOP inserted bc control hazard" << endl;
 			hazard_type = CONTROL;
-			return true;
 	}
-
-	if(num_NOPS > 0){
+	
+	if((num_NOPS > 0) && (op_id != EOP)){
 		cout << "EOP inserted bc num_NOPS" << endl;
 		return true;
 	}
 	
+		
 	return false;
 }
 
@@ -508,6 +521,9 @@ void sim_pipe::insert_NOP(){
 			break;
 		case CONTROL:
 			sp_registers[ID][IR] = (NOP << (INST_SIZE - OP_SIZE));
+			break;
+		case STRUCTURAL:
+			sp_registers[EX][IR] = (NOP << (INST_SIZE - OP_SIZE));
 			break;
 		default: break;
 	}
