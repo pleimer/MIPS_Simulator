@@ -39,9 +39,25 @@ void assembler::assemble(string path, byte * inst_memory){
 	int instruction;
 	int inst_mem_ptr = 0;
 	
+	while(true){ //build list of labels before compiling rest
+		try{
+			currInst = lex.get();
+			for (token tok: currInst){ 
+				if(tok.getType() == LABEL){
+					labels.push_back(tok);
+					break;	
+				}
+			}
+		}
+		catch(eofException){break;}	
+	}
+	
+	lex.reset_file_pointer();
+	
 	while(true){
 		try{
 			currInst = lex.get(); //one line of instructions
+			instruction = 0;
 			
 			for (token tok: currInst){ //compile instruction
 				switch(tok.getType()){
@@ -50,7 +66,6 @@ void assembler::assemble(string path, byte * inst_memory){
 						instruction = instruction << (INST_SIZE - OP_SIZE);
 						break;
 					}
-					
 					
 					case REGISTER: {//registers
 						string reg = tok.getCargo();
@@ -61,11 +76,11 @@ void assembler::assemble(string path, byte * inst_memory){
 						reg.pop_back();
 						unsigned int regNum = stoi(reg);
 						if(tok.getCol() == 1)
-							regNum = regNum <<  (INST_SIZE - OP_SIZE - REG_REF_SIZE*3); //rd
+							regNum = regNum <<  (INST_SIZE - OP_SIZE - REG_REF_SIZE); //rd
 						if(tok.getCol() == 2)
-							regNum = regNum <<  (INST_SIZE - OP_SIZE - REG_REF_SIZE); //rs
+							regNum = regNum <<  (INST_SIZE - OP_SIZE - REG_REF_SIZE*2); //rs
 						if(tok.getCol() == 3)
-							regNum = regNum <<  (INST_SIZE - OP_SIZE - REG_REF_SIZE*2); //rt
+							regNum = regNum <<  (INST_SIZE - OP_SIZE - REG_REF_SIZE*3); //rt
 						
 						instruction = instruction | regNum;
 					
@@ -130,17 +145,21 @@ void assembler::assemble(string path, byte * inst_memory){
 						break;
 					}
 					
-					case LABEL: {
+					/*case LABEL: {
 						//this builds vector full of LABEL tokens that have all information for referencing later
 						labels.push_back(tok);
+						for(token t: labels){
+							cout << "Token: " << t.getCargo() << " Line: " <<  t.getLine() << endl;
+						}
 						break;	
-					}
+					}*/
 					case REF_LABEL: {
 						//find token in tokens vector, get linenumber, calculate offset
 						string cargo = tok.getCargo();
 						cargo += ":"; //Label token cargo contains the colon
-						int offset;
+						int offset=0;
 						unsigned int pos = 0;
+				
 				
 						for(token item: labels){
 							if(cargo.compare(item.getCargo()) == 0)
@@ -149,9 +168,12 @@ void assembler::assemble(string path, byte * inst_memory){
 						}
 
 						//calculate offset
+						cout << "Branch line is: " << tok.getLine() << endl;
+						cout << "The label line is: "<< labels[pos].getLine() << endl; 
 						offset = -1*(tok.getLine() - labels[pos].getLine());
 						offset &= LABEL_MASK;
 
+						cout << "Offset is: " << hex << offset << endl;
 						instruction = instruction | offset;
 						
 						break;
@@ -196,17 +218,42 @@ byte assembler::mapCode(token tok){ //return binary opcode value from token stri
 		return (byte)(SUBI);
 	if(cargo.compare("XOR")==0)
 		return (byte)(XOR);
+	if(cargo.compare("XORI")==0)
+		return (byte)(XORI);
+	if(cargo.compare("OR")==0)
+		return (byte)(OR);
+	if(cargo.compare("ORI")==0)
+		return (byte)(ORI);
+	if(cargo.compare("AND")==0)
+		return (byte)(AND);
+	if(cargo.compare("ANDI")==0)
+		return (byte)(ANDI);
 	if(cargo.compare("BLTZ")==0)
 		return (byte)(BLTZ);
+	if(cargo.compare("BEQZ")==0)
+		return (byte)(BEQZ);
 	if(cargo.compare("BNEZ")==0)
 		return (byte)(BNEZ);
+	if(cargo.compare("BLTZ")==0)
+		return (byte)(BLTZ);
+	if(cargo.compare("BGTZ")==0)
+		return (byte)(BGTZ);
+	if(cargo.compare("BLEZ")==0)
+		return (byte)(BLEZ);
+	if(cargo.compare("BGEZ")==0)
+		return (byte)(BGEZ);
+	if(cargo.compare("JUMP")==0)
+		return (byte)(JUMP);
 	if(cargo.compare("EOP")==0)
-		return (byte)(EOP);;
+		return (byte)(EOP);
+	
+	
 	
 	return 0xFC; //bad value
 }
 
 lexer::lexer(string path){
+	lineIndex = 0;
 	istringstream iss (path);
 	string token;
 	while(getline(iss,token,'.'));
@@ -223,6 +270,11 @@ lexer::~lexer(){
 	
 }
 
+void lexer::reset_file_pointer(){
+	lineIndex = 0;
+	asmFile.clear(); //return to beginning of file
+	asmFile.seekg(0, ios::beg);
+}
 
 vector<token> lexer::get(){
 	//get next line and divide into tokens, return vector of tokens
@@ -231,7 +283,6 @@ vector<token> lexer::get(){
 	vector<token> tokens;
 	tokenType type;
 	unsigned int column = 0;
-	static unsigned int lineIndex;
 
 	getline(asmFile, line);
 

@@ -60,9 +60,11 @@ class sim_pipe{
 	//assembler declaration
 	assembler as;
 	
-	//hazard type
-	hazard_t hazard_type;
-	bool hazard;
+	//hazard control
+	bool data_hazard;
+	bool control_hazard;
+	bool structural_hazard;
+	hazard_t prev_hazard;
 
 public:
 
@@ -160,10 +162,12 @@ public:
 	int get_inst_type(int inst);
 	
 	//detect hazards
-	bool isHazard();
+	bool isDataHazard();
+	bool isControlHazard();
+	bool isPrevHazard();
 	
 	//inject NOP into pipeline
-	void insert_NOP();
+	void insert_NOP(hazard_t hazard_type);
 
 };
 

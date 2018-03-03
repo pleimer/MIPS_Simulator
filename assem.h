@@ -82,12 +82,15 @@ class lexer{
 		
 		void split(const string &s, const char* delim, vector<string> & v);
 		
+		unsigned lineIndex;
+		
 		
 	public:
 		lexer(string path);
 		~lexer();
 		vector<token> get();
 		tokenType detType(string token_str, unsigned int column);
+		void reset_file_pointer();
 
 };
 
