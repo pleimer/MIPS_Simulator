@@ -69,7 +69,7 @@ void sim_pipe::load_program(const char *filename, unsigned base_address){
 	as.assemble(filename, inst_memory);
 	//start pc at base address
 	sp_registers[IF][PC] = base_address; //start at 0
-	int inst = get_inst(sp_registers[IF][PC] - 0x10000000);
+	//int inst = get_inst(sp_registers[IF][PC] - 0x10000000);
 	this->print_inst_memory(base_address - 0x10000000, base_address - 0x10000000 + 0x000F * 4);
 }
 
@@ -92,14 +92,16 @@ bool sim_pipe::pipeline(){
 	
 	//MEM	
 	exec_MEM();
+	//clear_stage(MEM);
 	
 	if(!structural_hazard){
 		exec_EX();
+		clear_stage(EX);
 		
 		
 		//ID
 		exec_ID();
-		//clear_stage(ID);
+		clear_stage(ID);
 		
 		//IF
 		exec_IF();
@@ -269,11 +271,26 @@ void sim_pipe::exec_EX(){
 		//	cout << "Added together. EX_NPC: " << hex << sp_registers[EX][NPC] << " EX_IMM: " << hex << sp_registers[EX][NPC] << endl;
 			sp_registers[MEM][ALU_OUTPUT] = ((sp_registers[EX][NPC]) + (sp_registers[EX][IMM] << 2) - 4);
 			switch(OPCODE(get_ir_reg(EX))){
+			case BEQZ:
+				if(sp_registers[EX][A] == 0) sp_registers[MEM][COND] = 1;
+				break;
 			 case BNEZ:
 				if(sp_registers[EX][A] != 0) sp_registers[MEM][COND] = 1;
 				break;
 			case BLTZ:
 				if(sp_registers[EX][A] < 0) sp_registers[MEM][COND] = 1;
+				break;
+			case BGTZ:
+				if(sp_registers[EX][A] > 0) sp_registers[MEM][COND] = 1;
+				break;	
+			case BLEZ:
+				if(sp_registers[EX][A] <= 0) sp_registers[MEM][COND] = 1;
+				break;
+			case BGEZ:
+				if(sp_registers[EX][A] >= 0) sp_registers[MEM][COND] = 1;
+				break;
+			case JUMP:
+				sp_registers[MEM][COND] = 1;
 				break;
 			default:
 				break;
