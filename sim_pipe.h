@@ -27,10 +27,11 @@ typedef enum {PC, NPC, IR, A, B, IMM, COND, ALU_OUTPUT, LMD} sp_register_t;
 
 // The NOP instruction should be automatically inserted by the processor to implement pipeline bubbles
 typedef enum {LW, SW, ADD, ADDI, SUB, SUBI, XOR, XORI, OR, ORI, AND, ANDI, MULT, DIV, BEQZ, BNEZ, BLTZ, BGTZ, BLEZ, BGEZ, JUMP, EOP, NOP} opcode_t;
-typedef enum {ARITH_I, ARITH, MEMORY, BRANCH, UNDEF_INST} inst_t;
+typedef enum {ARITH_I, ARITH, MEMORY, BRANCH, TRAP, UNDEF_INST} inst_t;
 
 typedef enum {IF, ID, EX, MEM, WB} stage_t;
 typedef enum {DATA, CONTROL, STRUCTURAL} hazard_t;
+typedef enum {RS_T, RT_T, RD_T} operand_t;
 
 
 class sim_pipe{
@@ -64,6 +65,7 @@ class sim_pipe{
 	bool data_hazard;
 	bool control_hazard;
 	bool structural_hazard;
+	bool is_prev_hazard;
 	hazard_t prev_hazard;
 
 public:
@@ -168,6 +170,10 @@ public:
 	
 	//inject NOP into pipeline
 	void insert_NOP(hazard_t hazard_type);
+	
+	void clear_stage(stage_t);
+	
+	int get_register_ref(int inst, operand_t arg); //get register in instruction at position
 
 };
 
